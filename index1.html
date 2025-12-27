@@ -1,0 +1,544 @@
+```html
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>דף כפתורים עם גרירה</title>
+
+  <style>
+    :root { --tileSize: 140px; }
+
+    body{
+      margin:0;
+      min-height:100vh;
+      background:#0f172a;
+      font-family: Arial, sans-serif;
+      color:#fff;
+      display:flex;
+      justify-content:center;
+      padding:24px;
+    }
+
+    .app{ width:min(1050px,100%); }
+
+    h1{ margin:0 0 14px 0; font-size:20px; }
+
+    .top{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:stretch;
+      margin-bottom:12px;
+    }
+
+    .form{
+      display:grid;
+      grid-template-columns: 1fr 2fr auto;
+      gap:10px;
+      flex: 1 1 560px;
+    }
+
+    input, button{
+      padding:11px 12px;
+      font-size:14px;
+      border:none;
+      border-radius:12px;
+    }
+
+    input{
+      background:#1e293b;
+      color:#fff;
+      outline:1px solid rgba(255,255,255,.10);
+    }
+
+    button{
+      background:#3b82f6;
+      color:#fff;
+      cursor:pointer;
+    }
+    button:hover{ background:#2563eb; }
+
+    .panel{
+      flex: 1 1 360px;
+      background:#111c33;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:16px;
+      padding:12px 14px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .row label{ font-size:13px; color:#cbd5e1; white-space:nowrap; }
+    .row output{ font-size:13px; color:#e5e7eb; min-width:64px; text-align:left; direction:ltr; }
+    input[type="range"]{ width:100%; }
+
+    .ghost{ background:#334155; }
+    .ghost:hover{ background:#475569; }
+
+    .editOn{ background:#22c55e; }
+    .editOn:hover{ background:#16a34a; }
+
+    #msg{
+      margin:10px 0 16px 0;
+      color:#cbd5e1;
+      min-height:18px;
+    }
+
+    .container{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(var(--tileSize), 1fr));
+      gap:18px;
+    }
+
+    .tile{
+      width: var(--tileSize);
+      height: var(--tileSize);
+      justify-self:center;
+      position:relative;
+
+      background:#1e293b;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:12px;
+
+      font-weight:800;
+      user-select:none;
+      transition:.14s;
+      cursor:pointer;
+    }
+
+    .tile:hover{
+      background:#3b82f6;
+      transform: translateY(-4px) scale(1.02);
+    }
+
+    /* במצב עריכה לא צובעים ב-hover */
+    .edit-mode .tile:hover{
+      background:#243552;
+      transform:none;
+    }
+
+    .actions{
+      position:absolute;
+      top:10px;
+      right:10px;
+      display:none;
+      gap:8px;
+      align-items:center;
+    }
+    .edit-mode .actions{ display:flex; }
+
+    .iconBtn{
+      width:32px;
+      height:32px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.10);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:.12s;
+      font-size:14px;
+    }
+    .iconBtn:hover{ background: rgba(255,255,255,.18); }
+
+    .delBtn{
+      background: rgba(239,68,68,.20);
+      border-color: rgba(239,68,68,.45);
+    }
+    .delBtn:hover{ background: rgba(239,68,68,.32); }
+
+    .handle{
+      cursor:grab;
+      touch-action:none; /* חשוב לגרירה בכרום/מובייל */
+    }
+    .handle:active{ cursor:grabbing; }
+
+    /* מודאל */
+    .modalWrap{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .modal{
+      width:min(520px,100%);
+      background:#0b1427;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:18px;
+      padding:16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+    .modal h2{ margin:0 0 10px 0; font-size:18px; }
+    .modal .grid{ display:grid; gap:10px; }
+    .modal .btnRow{ display:flex; gap:10px; margin-top:12px; }
+
+    .hint{
+      font-size:12px;
+      color:#a9b6d6;
+      line-height:1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <h1>דף כפתורים – הוספה / עריכה / מחיקה / גרירה</h1>
+
+    <div class="top">
+      <div class="form">
+        <input id="label" placeholder="שם כפתור (למשל: Google)">
+        <input id="url" placeholder="כתובת (למשל: https://google.com)" dir="ltr">
+        <button id="addBtn" type="button">הוסף</button>
+      </div>
+
+      <div class="panel">
+        <div class="row">
+          <label for="sizeRange">גודל כפתורים</label>
+          <output id="sizeOut">140px</output>
+        </div>
+        <input id="sizeRange" type="range" min="80" max="220" value="140" step="5">
+
+        <div class="row" style="gap:10px;">
+          <button id="editBtn" class="ghost" type="button">מצב עריכה: כבוי</button>
+          <button id="resetBtn" class="ghost" type="button">איפוס</button>
+        </div>
+
+        <div class="hint">
+          מצב עריכה מציג: ✏️ עריכה, ❌ מחיקה, ☰ גרירה (תפוס וגרור)<br>
+          מחיקה מהירה: <b dir="ltr">Shift</b> + קליק על כפתור (רק בעריכה)
+        </div>
+      </div>
+    </div>
+
+    <div id="msg"></div>
+    <div id="buttons" class="container"></div>
+  </div>
+
+  <!-- Modal עריכה -->
+  <div id="modalWrap" class="modalWrap" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h2>עריכת כפתור</h2>
+      <div class="grid">
+        <input id="editLabel" placeholder="שם כפתור">
+        <input id="editUrl" placeholder="https://example.com" dir="ltr">
+      </div>
+      <div class="btnRow">
+        <button id="saveEditBtn" type="button">שמור</button>
+        <button id="cancelEditBtn" class="ghost" type="button">ביטול</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ====== Storage keys ======
+    const STORAGE_KEY = "buttons_v1_clean";
+    const SIZE_KEY = "tile_size_v1_clean";
+    const EDIT_KEY = "edit_mode_v1_clean";
+
+    // ====== Elements ======
+    const container = document.getElementById("buttons");
+    const msgEl = document.getElementById("msg");
+
+    const labelEl = document.getElementById("label");
+    const urlEl = document.getElementById("url");
+    const addBtn = document.getElementById("addBtn");
+
+    const resetBtn = document.getElementById("resetBtn");
+    const editBtn = document.getElementById("editBtn");
+
+    const sizeRange = document.getElementById("sizeRange");
+    const sizeOut = document.getElementById("sizeOut");
+
+    const modalWrap = document.getElementById("modalWrap");
+    const editLabelEl = document.getElementById("editLabel");
+    const editUrlEl = document.getElementById("editUrl");
+    const saveEditBtn = document.getElementById("saveEditBtn");
+    const cancelEditBtn = document.getElementById("cancelEditBtn");
+
+    // ====== State ======
+    let buttons = [];
+    let editMode = false;
+    let editingIndex = null;
+
+    // ====== Helpers ======
+    function setMsg(text){
+      msgEl.textContent = text;
+      if(text){
+        setTimeout(()=>{ if(msgEl.textContent === text) msgEl.textContent=""; }, 2200);
+      }
+    }
+
+    function normalizeUrl(u){
+      let url = (u || "").trim();
+      if(!url) return "";
+      if(!/^https?:\/\//i.test(url)) url = "https://" + url;
+      return url;
+    }
+
+    function isValidUrl(url){
+      try { new URL(url); return true; } catch { return false; }
+    }
+
+    function load(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        try { buttons = JSON.parse(raw) || []; }
+        catch { buttons = []; }
+      } else {
+        buttons = [
+          {label:"Google", url:"https://google.com"},
+          {label:"YouTube", url:"https://youtube.com"},
+          {label:"GitHub", url:"https://github.com"},
+          {label:"Wikipedia", url:"https://wikipedia.org"}
+        ];
+      }
+    }
+
+    function save(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(buttons));
+    }
+
+    // ====== Size slider ======
+    function applyTileSize(px){
+      document.documentElement.style.setProperty("--tileSize", px + "px");
+      sizeOut.textContent = px + "px";
+      localStorage.setItem(SIZE_KEY, String(px));
+    }
+
+    const savedSize = parseInt(localStorage.getItem(SIZE_KEY), 10);
+    const initialSize = Number.isFinite(savedSize) ? savedSize : 140;
+    sizeRange.value = String(initialSize);
+    applyTileSize(initialSize);
+    sizeRange.addEventListener("input", ()=> applyTileSize(parseInt(sizeRange.value, 10)));
+
+    // ====== Edit mode ======
+    function setEditMode(on){
+      editMode = !!on;
+      localStorage.setItem(EDIT_KEY, editMode ? "1" : "0");
+      document.body.classList.toggle("edit-mode", editMode);
+      editBtn.textContent = editMode ? "מצב עריכה: פעיל" : "מצב עריכה: כבוי";
+      editBtn.classList.toggle("editOn", editMode);
+      setMsg(editMode ? "מצב עריכה הופעל" : "מצב עריכה כובה");
+      render();
+    }
+
+    setEditMode(localStorage.getItem(EDIT_KEY) === "1");
+    editBtn.addEventListener("click", ()=> setEditMode(!editMode));
+
+    // ====== Add ======
+    function addButton(){
+      const label = labelEl.value.trim();
+      const url = normalizeUrl(urlEl.value);
+
+      if(!label || !url){ setMsg("נא למלא שם וכתובת."); return; }
+      if(!isValidUrl(url)){ setMsg("הכתובת לא תקינה. נסה: https://example.com"); return; }
+
+      buttons.push({label, url});
+      save();
+      render();
+
+      labelEl.value = "";
+      urlEl.value = "";
+      labelEl.focus();
+      setMsg("נוסף ✅");
+    }
+
+    addBtn.addEventListener("click", addButton);
+    [labelEl, urlEl].forEach(el => el.addEventListener("keydown", (e)=>{ if(e.key==="Enter") addButton(); }));
+
+    // ====== Delete ======
+    function removeAt(index){
+      if(index < 0 || index >= buttons.length) return;
+      const name = buttons[index].label;
+      if(confirm(`למחוק את "${name}"?`)){
+        buttons.splice(index, 1);
+        save();
+        render();
+        setMsg("נמחק ✅");
+      }
+    }
+
+    // ====== Modal edit ======
+    function openEdit(index){
+      editingIndex = index;
+      editLabelEl.value = buttons[index].label;
+      editUrlEl.value = buttons[index].url;
+      modalWrap.style.display = "flex";
+      editLabelEl.focus();
+    }
+
+    function closeEdit(){
+      editingIndex = null;
+      modalWrap.style.display = "none";
+    }
+
+    cancelEditBtn.addEventListener("click", closeEdit);
+    modalWrap.addEventListener("click", (e)=>{ if(e.target === modalWrap) closeEdit(); });
+    document.addEventListener("keydown", (e)=>{
+      if(e.key === "Escape" && modalWrap.style.display === "flex") closeEdit();
+    });
+
+    function saveEdit(){
+      if(editingIndex === null) return;
+
+      const newLabel = editLabelEl.value.trim();
+      const newUrl = normalizeUrl(editUrlEl.value);
+
+      if(!newLabel || !newUrl){ setMsg("נא למלא שם וכתובת לעריכה."); return; }
+      if(!isValidUrl(newUrl)){ setMsg("הכתובת לא תקינה. נסה: https://example.com"); return; }
+
+      buttons[editingIndex] = {label:newLabel, url:newUrl};
+      save();
+      render();
+      closeEdit();
+      setMsg("עודכן ✅");
+    }
+
+    saveEditBtn.addEventListener("click", saveEdit);
+    [editLabelEl, editUrlEl].forEach(el => el.addEventListener("keydown", (e)=>{ if(e.key==="Enter") saveEdit(); }));
+
+    // ====== Reset ======
+    resetBtn.addEventListener("click", ()=>{
+      localStorage.removeItem(STORAGE_KEY);
+      load();
+      save();
+      render();
+      setMsg("בוצע איפוס.");
+    });
+
+    // ====== DRAG (Pointer Events) ======
+    // גרירה עובדת רק במצב עריכה, ותופסים את ☰
+    const drag = { active:false, curIndex:null, pointerId:null };
+
+    function moveItem(arr, from, to){
+      if(from === to) return;
+      const [it] = arr.splice(from, 1);
+      arr.splice(to, 0, it);
+    }
+
+    function tileFromPoint(x,y){
+      const el = document.elementFromPoint(x,y);
+      if(!el) return null;
+      return el.closest(".tile");
+    }
+
+    function startDrag(e, index){
+      if(!editMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      drag.active = true;
+      drag.curIndex = index;
+      drag.pointerId = e.pointerId;
+
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setMsg("גרירה פעילה…");
+    }
+
+    function onMove(e){
+      if(!drag.active) return;
+
+      const t = tileFromPoint(e.clientX, e.clientY);
+      if(!t) return;
+
+      const toIndex = Number(t.dataset.index);
+      if(!Number.isFinite(toIndex)) return;
+
+      if(toIndex !== drag.curIndex){
+        moveItem(buttons, drag.curIndex, toIndex);
+        drag.curIndex = toIndex;
+        save();
+        render();
+      }
+    }
+
+    function endDrag(){
+      if(!drag.active) return;
+      drag.active = false;
+      drag.curIndex = null;
+      drag.pointerId = null;
+      setMsg("הסדר עודכן ✅");
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", endDrag);
+    document.addEventListener("pointercancel", endDrag);
+
+    // ====== Render ======
+    function render(){
+      container.innerHTML = "";
+
+      buttons.forEach((b, index)=>{
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.dataset.index = String(index);
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const editIcon = document.createElement("div");
+        editIcon.className = "iconBtn";
+        editIcon.title = "ערוך";
+        editIcon.textContent = "✏️";
+        editIcon.onclick = (e)=>{ e.stopPropagation(); openEdit(index); };
+
+        const delIcon = document.createElement("div");
+        delIcon.className = "iconBtn delBtn";
+        delIcon.title = "מחק";
+        delIcon.textContent = "❌";
+        delIcon.onclick = (e)=>{ e.stopPropagation(); removeAt(index); };
+
+        const handle = document.createElement("div");
+        handle.className = "iconBtn handle";
+        handle.title = "גרור לשינוי סדר";
+        handle.textContent = "☰";
+        handle.addEventListener("pointerdown", (e)=> startDrag(e, index));
+
+        actions.appendChild(editIcon);
+        actions.appendChild(delIcon);
+        actions.appendChild(handle);
+        tile.appendChild(actions);
+
+        const text = document.createElement("div");
+        text.textContent = b.label;
+        tile.appendChild(text);
+
+        tile.onclick = (e)=>{
+          if(editMode){
+            if(e.shiftKey) removeAt(index);
+            else setMsg("עריכה פעילה: ✏️ לעריכה, ❌ למחיקה, ☰ לגרירה");
+            return;
+          }
+          window.open(b.url, "_blank", "noopener");
+        };
+
+        container.appendChild(tile);
+      });
+    }
+
+    // ====== Init ======
+    load();
+    save();
+    render();
+  </script>
+</body>
+</html>
+```
